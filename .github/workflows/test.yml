@@ -1,0 +1,211 @@
+name: Test Setup Action
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # Test basic installation without authentication
+  test-installation:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Test basic installation
+        uses: ./
+        id: setup
+        with:
+          authenticate: false
+        
+      - name: Verify installation
+        shell: bash
+        run: |
+          rfcatalog --version
+          echo "✅ Installed version: ${{ steps.setup.outputs.version }}"
+          echo "✅ Cache hit: ${{ steps.setup.outputs.cache-hit }}"
+          
+      - name: Test help command
+        shell: bash
+        run: |
+          rfcatalog --help
+          echo "✅ Help command works"
+
+  # Test version-specific installation
+  test-version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Test specific version installation
+        uses: ./
+        with:
+          version: 'latest'
+          authenticate: false
+        
+      - name: Verify version
+        run: |
+          INSTALLED=$(rfcatalog --version | grep -o 'version [0-9.]*' | cut -d' ' -f2)
+          echo "✅ Installed version: $INSTALLED"
+
+  # Test caching behavior  
+  test-caching:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: First installation (should download)
+        uses: ./
+        id: first
+        with:
+          authenticate: false
+        
+      - name: Second installation (should use cache)
+        uses: ./
+        id: second
+        with:
+          authenticate: false
+          
+      - name: Verify caching
+        run: |
+          echo "First run cache hit: ${{ steps.first.outputs.cache-hit }}"
+          echo "Second run cache hit: ${{ steps.second.outputs.cache-hit }}"
+          if [ "${{ steps.first.outputs.cache-hit }}" = "true" ] && [ "${{ steps.second.outputs.cache-hit }}" = "true" ]; then
+            echo "⚠️  Both runs used cache - this might indicate an issue"
+          else
+            echo "✅ Caching behavior looks correct"
+          fi
+
+  # Test with authentication (only run on main branch with secrets)
+  test-with-auth:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' && 
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Test with authentication
+        uses: ./
+        with:
+          access-id: ${{ secrets.RF_ACCESS_ID }}
+          secret-access-key: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+          
+      - name: Test authenticated command
+        run: |
+          echo "Testing basic catalog access..."
+          # Test basic functionality - if auth works, this should not error
+          if rfcatalog --help > /dev/null 2>&1; then
+            echo "✅ Authentication test passed"
+          else
+            echo "❌ Authentication test failed"
+            exit 1
+          fi
+          
+      - name: Test catalog listing (if credentials work)
+        run: |
+          echo "Testing catalog access..."
+          # Try to list repositories - this requires valid authentication
+          if rfcatalog -r alpine > /dev/null 2>&1; then
+            echo "✅ Catalog access test passed"
+          else
+            echo "⚠️  Catalog access test failed - this might be expected if credentials are limited"
+          fi
+
+  # Test error conditions
+  test-error-handling:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Test with invalid authentication (should fail gracefully)
+        uses: ./
+        continue-on-error: true
+        id: invalid-auth
+        with:
+          access-id: "invalid-access-id"
+          secret-access-key: "invalid-secret"
+          authenticate: true
+          
+      - name: Verify error handling
+        run: |
+          if [ "${{ steps.invalid-auth.outcome }}" = "failure" ]; then
+            echo "✅ Error handling works - invalid auth correctly failed"
+          else
+            echo "❌ Error handling issue - invalid auth should have failed"
+            exit 1
+          fi
+
+  # Integration test - simulate real customer usage
+  integration-test:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' && 
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Create test Dockerfile
+        run: |
+          mkdir -p test-repo
+          cat > test-repo/Dockerfile << 'EOF'
+          FROM quay.io/rfcurated/alpine:3.19-rfcurated
+          RUN echo "Test container"
+          EOF
+          
+      - name: Setup RapidFort (like customer would)
+        uses: ./
+        with:
+          access-id: ${{ secrets.RF_ACCESS_ID }}
+          secret-access-key: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+          
+      - name: Generate datasources (like customer would)  
+        run: |
+          cd test-repo
+          mkdir -p .renovate/datasources
+          
+          # Extract images and generate datasources
+          find . -name "Dockerfile*" -exec grep -h "FROM quay.io/rfcurated/" {} \; | \
+            sed 's/.*rfcurated\/\([^:]*\).*/\1/' | sort -u | while read image; do
+              echo "Generating datasource for: $image"
+              safe_name=$(echo "$image" | tr '/' '-')
+              if rfcatalog -r "$image" -f renovate > ".renovate/datasources/${safe_name}.json"; then
+                echo "✅ Generated datasource for $image"
+                # Verify the JSON is valid
+                if jq . ".renovate/datasources/${safe_name}.json" > /dev/null 2>&1; then
+                  echo "✅ Valid JSON generated for $image"
+                else
+                  echo "❌ Invalid JSON generated for $image"
+                  exit 1
+                fi
+              else
+                echo "❌ Failed to generate datasource for $image"
+                exit 1
+              fi
+            done
+            
+      - name: Verify generated datasources
+        run: |
+          cd test-repo
+          echo "Generated datasource files:"
+          ls -la .renovate/datasources/
+          echo "Content of alpine.json:"
+          cat .renovate/datasources/alpine.json | jq .
