@@ -1,0 +1,136 @@
+name: 'Setup RapidFort Catalog'
+description: 'Install and configure rfcatalog CLI for RapidFort curated container images'
+author: 'RapidFort'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'Version of rfcatalog to install (default: latest)'
+    required: false
+    default: 'latest'
+  
+  access-id:
+    description: 'RapidFort Access ID for authentication'
+    required: false
+    
+  secret:
+    description: 'RapidFort Secret for authentication'  
+    required: false
+
+  authenticate:
+    description: 'Whether to authenticate with RapidFort (default: true if credentials provided)'
+    required: false
+    default: 'auto'
+
+outputs:
+  version:
+    description: 'Version of rfcatalog that was installed'
+    value: ${{ steps.setup.outputs.version }}
+    
+  cache-hit:
+    description: 'Whether the installation was restored from cache'
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine version
+      id: version
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          echo "🔍 Fetching latest rfcatalog version..."
+          VERSION=$(curl -s https://us01.rapidfort.com/cli/VERSION | cut -d' ' -f1)
+          echo "Latest version: $VERSION"
+        else
+          VERSION="${{ inputs.version }}"
+          echo "Requested version: $VERSION"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Cache rfcatalog binary
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/bin/rfcatalog
+        key: rfcatalog-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
+        restore-keys: |
+          rfcatalog-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Install rfcatalog
+      id: setup
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "⬇️ Installing rfcatalog ${{ steps.version.outputs.version }}..."
+        
+        # Create local bin directory
+        mkdir -p "$HOME/.local/bin"
+        
+        # Download and extract
+        DOWNLOAD_URL="https://us01.rapidfort.com/cli/rfcatalog-$(uname)-$(uname -m).tar.gz"
+        echo "Downloading from: $DOWNLOAD_URL"
+        
+        if curl -L "$DOWNLOAD_URL" | tar -xz -C "$HOME/.local/bin"; then
+          chmod +x "$HOME/.local/bin/rfcatalog"
+          echo "✅ rfcatalog downloaded and extracted successfully"
+        else
+          echo "❌ Failed to download or extract rfcatalog"
+          exit 1
+        fi
+
+    - name: Add to PATH and verify
+      shell: bash
+      run: |
+        # Add to GitHub PATH for subsequent steps
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        
+        # Verify installation
+        if "$HOME/.local/bin/rfcatalog" --version; then
+          INSTALLED_VERSION=$("$HOME/.local/bin/rfcatalog" --version | grep -o 'version [0-9.]*[0-9]' | cut -d' ' -f2)
+          echo "✅ rfcatalog $INSTALLED_VERSION ready!"
+          echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "❌ rfcatalog installation verification failed"
+          exit 1
+        fi
+
+    - name: Authenticate with RapidFort
+      shell: bash
+      if: >
+        (inputs.authenticate == 'true') || 
+        (inputs.authenticate == 'auto' && inputs.access-id != '' && inputs.secret != '')
+      run: |
+        echo "🔐 Authenticating with RapidFort..."
+        
+        if [ -z "${{ inputs.access-id }}" ] || [ -z "${{ inputs.secret }}" ]; then
+          echo "❌ RapidFort credentials not provided"
+          echo "Please set access-id and secret inputs, or use GitHub Secrets"
+          exit 1
+        fi
+        
+        if rfcatalog auth --access-id "${{ inputs.access-id }}" --secret "${{ inputs.secret }}"; then
+          echo "✅ Successfully authenticated with RapidFort"
+        else
+          echo "❌ Failed to authenticate with RapidFort"
+          echo "Please verify your Access ID and Secret are correct"
+          exit 1
+        fi
+
+    - name: Setup complete
+      shell: bash
+      run: |
+        echo "🎉 RapidFort setup complete!"
+        echo "• rfcatalog version: $(rfcatalog --version | grep -o 'version [0-9.]*[0-9]' | cut -d' ' -f2)"
+        echo "• Installation path: $HOME/.local/bin/rfcatalog"
+        echo "• Cache hit: ${{ steps.cache.outputs.cache-hit || 'false' }}"
+        
+        # Show available commands
+        echo ""
+        echo "Available commands:"
+        echo "  rfcatalog --help"
+        echo "  rfcatalog -r alpine -f renovate"
+        echo ""
