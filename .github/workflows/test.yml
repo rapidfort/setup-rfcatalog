@@ -134,22 +134,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Test with invalid authentication (should fail gracefully)
+      - name: Setup with invalid authentication
         uses: ./
-        continue-on-error: true
-        id: invalid-auth
         with:
           access-id: "invalid-access-id"
           secret: "invalid-secret"
-          authenticate: true
           
-      - name: Verify error handling
+      - name: Test that rfcatalog fails with bad credentials
         run: |
-          if [ "${{ steps.invalid-auth.conclusion }}" = "failure" ] || [ "${{ steps.invalid-auth.outcome }}" = "failure" ]; then
-            echo "✅ Error handling works - invalid auth correctly failed"
-          else
-            echo "❌ Error handling issue - invalid auth should have failed"
+          # This should fail because credentials are invalid
+          if rfcatalog -r alpine -f renovate > /dev/null 2>&1; then
+            echo "❌ rfcatalog should have failed with invalid credentials"
             exit 1
+          else
+            echo "✅ rfcatalog correctly failed with invalid credentials"
           fi
 
   # Integration test - simulate real customer usage
