@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: rapidfort/setup-rfcatalog@v1
+      - uses: rapidfort/setup-rfcatalog@v2
         with:
           access-id: ${{ secrets.RF_ACCESS_ID }}
           secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}

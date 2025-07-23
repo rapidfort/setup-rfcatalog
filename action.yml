@@ -133,26 +133,6 @@ runs:
         
         echo "✅ Authentication configured"
 
-    - name: Verify authentication
-      shell: bash
-      if: >
-        (inputs.authenticate == 'true') || 
-        (inputs.authenticate == 'auto' && inputs.access-id != '' && inputs.secret != '')
-      env:
-        RF_ACCESS_ID: ${{ inputs.access-id }}
-        RF_SECRET_ACCESS_KEY: ${{ inputs.secret }}
-      run: |
-        echo "🔍 Verifying RapidFort access..."
-        
-        # Test if rfcatalog can access the API
-        if rfcatalog -r alpine -f renovate > /dev/null 2>&1; then
-          echo "✅ Successfully authenticated with RapidFort"
-        else
-          echo "❌ Failed to authenticate with RapidFort"
-          echo "Please verify your Access ID and Secret are correct"
-          exit 1
-        fi
-
     - name: Setup complete
       shell: bash
       run: |
