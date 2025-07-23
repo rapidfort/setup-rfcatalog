@@ -103,7 +103,7 @@ jobs:
         uses: ./
         with:
           access-id: ${{ secrets.RF_ACCESS_ID }}
-          secret-access-key: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+          secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
           
       - name: Test authenticated command
         run: |
@@ -140,7 +140,7 @@ jobs:
         id: invalid-auth
         with:
           access-id: "invalid-access-id"
-          secret-access-key: "invalid-secret"
+          secret: "invalid-secret"
           authenticate: true
           
       - name: Verify error handling
@@ -175,7 +175,7 @@ jobs:
         uses: ./
         with:
           access-id: ${{ secrets.RF_ACCESS_ID }}
-          secret-access-key: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+          secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
           
       - name: Generate datasources (like customer would)  
         run: |
