@@ -37,13 +37,28 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Determine base URL
+      id: base-url
+      shell: bash
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+          BASE_URL="https://preprod.azure.rapidfort.io"
+          ENV_NAME="staging"
+        else
+          BASE_URL="https://us01.rapidfort.com"
+          ENV_NAME="production"
+        fi
+        echo "base-url=$BASE_URL" >> $GITHUB_OUTPUT
+        echo "environment=$ENV_NAME" >> $GITHUB_OUTPUT
+        echo "Using $ENV_NAME environment: $BASE_URL"
+
     - name: Determine version
       id: version
       shell: bash
       run: |
         if [ "${{ inputs.version }}" = "latest" ]; then
           echo "🔍 Fetching latest rfcatalog version..."
-          VERSION=$(curl -s https://us01.rapidfort.com/cli/VERSION | cut -d' ' -f1)
+          VERSION=$(curl -s ${{ steps.base-url.outputs.base-url }}/cli/VERSION | cut -d' ' -f1)
           echo "Latest version: $VERSION"
         else
           VERSION="${{ inputs.version }}"
@@ -71,7 +86,7 @@ runs:
         mkdir -p "$HOME/.local/bin"
         
         # Download and extract
-        DOWNLOAD_URL="https://us01.rapidfort.com/cli/rfcatalog-$(uname)-$(uname -m).tar.gz"
+        DOWNLOAD_URL="${{ steps.base-url.outputs.base-url }}/cli/rfcatalog-$(uname)-$(uname -m).tar.gz"
         echo "Downloading from: $DOWNLOAD_URL"
         
         if curl -L "$DOWNLOAD_URL" | tar -xz -C "$HOME/.local/bin"; then
@@ -124,6 +139,8 @@ runs:
       shell: bash
       run: |
         echo "🎉 RapidFort setup complete!"
+        echo "• Environment: ${{ steps.base-url.outputs.environment }}"
+        echo "• Base URL: ${{ steps.base-url.outputs.base-url }}"
         echo "• rfcatalog version: $(rfcatalog --version | grep -o 'version [0-9.]*[0-9]' | cut -d' ' -f2)"
         echo "• Installation path: $HOME/.local/bin/rfcatalog"
         echo "• Cache hit: ${{ steps.cache.outputs.cache-hit || 'false' }}"
