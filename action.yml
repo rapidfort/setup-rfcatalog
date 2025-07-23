@@ -130,7 +130,7 @@ runs:
         # Export credentials for rfcatalog to use
         echo "RF_ACCESS_ID=${{ inputs.access-id }}" >> $GITHUB_ENV
         echo "RF_SECRET_ACCESS_KEY=${{ inputs.secret }}" >> $GITHUB_ENV
-        
+        echo "RF_CONTAINER_ENGINE=docker" >> $GITHUB_ENV  # Add this!
         echo "✅ Authentication configured"
 
     - name: Setup complete
