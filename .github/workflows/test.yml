@@ -145,7 +145,7 @@ jobs:
           
       - name: Verify error handling
         run: |
-          if [ "${{ steps.invalid-auth.outcome }}" = "failure" ]; then
+          if [ "${{ steps.invalid-auth.conclusion }}" = "failure" ] || [ "${{ steps.invalid-auth.outcome }}" = "failure" ]; then
             echo "✅ Error handling works - invalid auth correctly failed"
           else
             echo "❌ Error handling issue - invalid auth should have failed"
