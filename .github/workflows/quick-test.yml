@@ -1,0 +1,26 @@
+name: Quick Test
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Test your action
+      - name: Setup rfcatalog
+        uses: ./
+        with:
+          access-id: ${{ secrets.RF_ACCESS_ID }}
+          secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+      
+      # Verify it works
+      - name: Test commands
+        run: |
+          echo "Testing rfcatalog..."
+          rfcatalog --version
+          
+          echo "Testing Alpine query..."
+          rfcatalog -r alpine -f renovate | jq '.releases[0]'
+
