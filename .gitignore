@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Test artifacts
+test-repo/
+.test-env/
+.test-home/
+
+# Logs
+*.log
+
+# GitHub Actions
+.github-path
+.github-output
+.github-env
+
+# Temporary files
+*.tmp
+*.temp

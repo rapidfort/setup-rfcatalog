@@ -3,7 +3,7 @@ on:
   push:
     branches: 
       - main
-      - staging  # Add staging branch here
+      - staging
 
 jobs:
   deploy:
@@ -12,11 +12,18 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup RapidFort Catalog
-        uses: rapidfort/setup-rfcatalog@v2
+        uses: rapidfort/setup-rfcatalog@v1  # Changed from v2 to v1
         with:
           access-id: ${{ secrets.RF_ACCESS_ID }}
           secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
           
-      - name: Your other steps
+      - name: Test rfcatalog
+        env:
+          RF_CONTAINER_ENGINE: docker
         run: |
-          # Your pipeline steps here
+          echo "Testing rfcatalog installation..."
+          rfcatalog --version
+          
+          # Test generating datasource
+          echo "Generating test datasource..."
+          rfcatalog -r alpine -f renovate | jq .

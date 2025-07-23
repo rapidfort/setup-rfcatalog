@@ -1,17 +1,18 @@
-# Setup RapidFort Catalog
+# Setup RapidFort Catalog Action
 
-This action installs `rfcatalog` and helps you update Dockerfiles with the latest RapidFort image digests.
+[![Test](https://github.com/rapidfort/setup-rfcatalog/actions/workflows/test.yml/badge.svg)](https://github.com/rapidfort/setup-rfcatalog/actions/workflows/test.yml)
 
-## What it does
+A GitHub Action to install and configure the `rfcatalog` CLI for managing RapidFort curated container images.
 
-1. Installs `rfcatalog` CLI tool
-2. Checks for new image digests from RapidFort
-3. Updates your Dockerfile with the latest digest
-4. Creates a PR when digests change
+## Features
+
+- 🚀 **One-line setup** - Install rfcatalog with a single action
+- ⚡ **Smart caching** - Cached installations for faster builds  
+- 🔄 **Auto-updates** - Always installs the latest version by default
+- 🔐 **Built-in authentication** - Optionally authenticate with RapidFort
+- 🎯 **Cross-platform** - Works on Linux and macOS runners
 
 ## Quick Start
-
-### 1. Add to your workflow
 
 ```yaml
 - uses: rapidfort/setup-rfcatalog@v1
@@ -20,13 +21,36 @@ This action installs `rfcatalog` and helps you update Dockerfiles with the lates
     secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
 ```
 
-### 2. Example: Update Alpine Image
+## Usage
 
-Start with this Dockerfile:
-```dockerfile
-FROM --platform=linux/amd64 quay.io/rfcurated/alpine:3.21-rfcurated
-RUN apk add --no-cache curl
+### Basic Installation (No Authentication)
+
+```yaml
+- uses: rapidfort/setup-rfcatalog@v1
+  with:
+    authenticate: false
 ```
+
+### With Authentication
+
+```yaml
+- uses: rapidfort/setup-rfcatalog@v1
+  with:
+    access-id: ${{ secrets.RF_ACCESS_ID }}
+    secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+```
+
+### Specific Version
+
+```yaml
+- uses: rapidfort/setup-rfcatalog@v1
+  with:
+    version: '1.4.3100'
+    access-id: ${{ secrets.RF_ACCESS_ID }}
+    secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+```
+
+## Complete Example: Update Docker Images
 
 Create `.github/workflows/update-images.yml`:
 
@@ -43,12 +67,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: rapidfort/setup-rfcatalog@v2
+      - uses: rapidfort/setup-rfcatalog@v1
         with:
           access-id: ${{ secrets.RF_ACCESS_ID }}
           secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
       
       - name: Check for updates
+        env:
+          RF_CONTAINER_ENGINE: docker
         run: |
           # Get current digest from Dockerfile
           CURRENT=$(grep "FROM.*alpine.*@sha256:" Dockerfile | grep -o "sha256:[a-f0-9]*" | cut -d: -f2)
@@ -69,7 +95,6 @@ jobs:
       - name: Update Dockerfile
         if: env.update_needed == 'true'
         run: |
-          # Update to digest pinning format
           sed -i "s|FROM --platform=linux/amd64 quay.io/rfcurated/alpine:3.21-rfcurated.*|FROM --platform=linux/amd64 quay.io/rfcurated/alpine:3.21-rfcurated@sha256:${{ env.new_digest }}|" Dockerfile
           
       - name: Create Pull Request
@@ -86,34 +111,59 @@ jobs:
           commit-message: "chore: update alpine to latest digest"
 ```
 
-## For ARM64 Architecture
+## Action Inputs
 
-Change the platform and architecture selection:
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `version` | Version of rfcatalog to install | No | `latest` |
+| `access-id` | RapidFort Access ID for authentication | No | - |
+| `secret` | RapidFort Secret for authentication | No | - |
+| `authenticate` | Whether to authenticate with RapidFort | No | `auto` |
 
-```dockerfile
-FROM --platform=linux/arm64 quay.io/rfcurated/alpine:3.21-rfcurated
-```
+## Action Outputs
 
-And in the workflow, select arm64:
+| Output | Description |
+|--------|-------------|
+| `version` | Version of rfcatalog that was installed |
+| `cache-hit` | Whether the installation was restored from cache |
+
+## Environment Variables
+
+If you're using container-related commands, set:
+
 ```yaml
-LATEST=$(rfcatalog -r alpine -f renovate | jq -r '.releases[] | select(.version == "3.21-rfcurated" and .architecture == "arm64") | .digest' | head -1)
+env:
+  RF_CONTAINER_ENGINE: docker  # or podman
 ```
 
-## Setup Requirements
+## Requirements
 
-1. Add GitHub Secrets:
+### 1. Get RapidFort Credentials
+
+1. Sign up at [rapidfort.com](https://rapidfort.com)
+2. Create a service account:
+   - Go to Settings → Service Accounts
+   - Click "Create Service Account"
+   - Save the Access ID and Secret Access Key
+
+### 2. Add GitHub Secrets
+
+In your repository:
+1. Go to Settings → Secrets and variables → Actions
+2. Add these secrets:
    - `RF_ACCESS_ID` - Your RapidFort Access ID
-   - `RF_SECRET_ACCESS_KEY` - Your RapidFort Secret
+   - `RF_SECRET_ACCESS_KEY` - Your RapidFort Secret Access Key
 
-2. The workflow will:
-   - Run daily
-   - Check if a new digest is available
-   - Update your Dockerfile
-   - Create a PR with the changes
+### 3. What the action does
+
+- Installs the latest rfcatalog CLI to `~/.local/bin/rfcatalog`
+- Adds it to PATH for subsequent steps
+- Configures authentication if credentials provided
+- Sets up RF_CONTAINER_ENGINE=docker automatically
 
 ## Manual Commands
 
-After setup, you can run these commands:
+After setup, you can run:
 
 ```bash
 # See all available Alpine versions
@@ -123,13 +173,11 @@ rfcatalog -r alpine -f renovate | jq '.releases[] | {version, architecture, dige
 rfcatalog -r alpine -f renovate | jq -r '.releases[] | select(.version == "3.21-rfcurated" and .architecture == "amd64") | .digest'
 ```
 
-## Result
+## Support
 
-When RapidFort publishes a new image, you'll get a PR that changes:
+- 📧 Email: support@rapidfort.com
+- 📚 Docs: [docs.rapidfort.com](https://docs.rapidfort.com)
 
-```diff
-- FROM --platform=linux/amd64 quay.io/rfcurated/alpine:3.21-rfcurated
-+ FROM --platform=linux/amd64 quay.io/rfcurated/alpine:3.21-rfcurated@sha256:d63e8b573b219ff955de4110facff828d73936ae62d6e95ef42f216ba293b4ef
-```
+## License
 
-This ensures you always use the exact same image (digest pinning) while getting automated updates.
+Apache 2.0
