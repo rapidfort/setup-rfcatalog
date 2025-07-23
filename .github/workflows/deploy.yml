@@ -1,0 +1,22 @@
+name: Deploy
+on:
+  push:
+    branches: 
+      - main
+      - staging  # Add staging branch here
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup RapidFort Catalog
+        uses: rapidfort/setup-rfcatalog@v1
+        with:
+          access-id: ${{ secrets.RF_ACCESS_ID }}
+          secret: ${{ secrets.RF_SECRET_ACCESS_KEY }}
+          
+      - name: Your other steps
+        run: |
+          # Your pipeline steps here
