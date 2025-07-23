@@ -127,7 +127,7 @@ runs:
           exit 1
         fi
         
-        if rfcatalog auth --access-id "${{ inputs.access-id }}" --secret "${{ inputs.secret }}"; then
+        if rfcatalog; then
           echo "✅ Successfully authenticated with RapidFort"
         else
           echo "❌ Failed to authenticate with RapidFort"
