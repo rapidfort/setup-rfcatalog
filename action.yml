@@ -113,13 +113,13 @@ runs:
           exit 1
         fi
 
-    - name: Authenticate with RapidFort
+    - name: Setup authentication
       shell: bash
       if: >
         (inputs.authenticate == 'true') || 
         (inputs.authenticate == 'auto' && inputs.access-id != '' && inputs.secret != '')
       run: |
-        echo "🔐 Authenticating with RapidFort..."
+        echo "🔐 Setting up RapidFort authentication..."
         
         if [ -z "${{ inputs.access-id }}" ] || [ -z "${{ inputs.secret }}" ]; then
           echo "❌ RapidFort credentials not provided"
@@ -127,7 +127,25 @@ runs:
           exit 1
         fi
         
-        if rfcatalog; then
+        # Export credentials for rfcatalog to use
+        echo "RF_ACCESS_ID=${{ inputs.access-id }}" >> $GITHUB_ENV
+        echo "RF_SECRET_ACCESS_KEY=${{ inputs.secret }}" >> $GITHUB_ENV
+        
+        echo "✅ Authentication configured"
+
+    - name: Verify authentication
+      shell: bash
+      if: >
+        (inputs.authenticate == 'true') || 
+        (inputs.authenticate == 'auto' && inputs.access-id != '' && inputs.secret != '')
+      env:
+        RF_ACCESS_ID: ${{ inputs.access-id }}
+        RF_SECRET_ACCESS_KEY: ${{ inputs.secret }}
+      run: |
+        echo "🔍 Verifying RapidFort access..."
+        
+        # Test if rfcatalog can access the API
+        if rfcatalog -r alpine -f renovate > /dev/null 2>&1; then
           echo "✅ Successfully authenticated with RapidFort"
         else
           echo "❌ Failed to authenticate with RapidFort"
