@@ -86,7 +86,13 @@ runs:
         mkdir -p "$HOME/.local/bin"
         
         # Download and extract
-        DOWNLOAD_URL="${{ steps.base-url.outputs.base-url }}/cli/rfcatalog-$(uname)-$(uname -m).tar.gz"
+        OS=$(uname | tr '[:upper:]' '[:lower:]')
+        case "$(uname -m)" in
+          x86_64|amd64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+          *) echo "❌ Unsupported architecture: $(uname -m)"; exit 1 ;;
+        esac
+        DOWNLOAD_URL="${{ steps.base-url.outputs.base-url }}/cli/${ARCH}/${OS}/cli.tar.gz"
         echo "Downloading from: $DOWNLOAD_URL"
         
         if curl -L "$DOWNLOAD_URL" | tar -xz -C "$HOME/.local/bin"; then
