@@ -93,6 +93,10 @@ runs:
           *) echo "❌ Unsupported architecture: $(uname -m)"; exit 1 ;;
         esac
         DOWNLOAD_URL="${{ steps.base-url.outputs.base-url }}/cli/${ARCH}/${OS}/cli.tar.gz"
+        VERSION="${{ steps.version.outputs.version }}"
+        if [ -n "$VERSION" ] && [ "$VERSION" != "latest" ]; then
+          DOWNLOAD_URL="${{ steps.base-url.outputs.base-url }}/cli/${VERSION}/${ARCH}/${OS}/cli.tar.gz"
+        fi
         echo "Downloading from: $DOWNLOAD_URL"
         
         if curl -L "$DOWNLOAD_URL" | tar -xz -C "$HOME/.local/bin"; then
